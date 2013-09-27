@@ -1,0 +1,24 @@
+{
+    "name": "lonnieezell/my_model",
+    "description": "A flexible MY_Model for your CodeIgniter applications.",
+    "license": "MIT",
+    "keywords": [
+        "codeigniter", "model"
+    ],
+    "authors": [
+        {
+            "name": "Lonnie Ezell",
+            "email": "lonnieezell@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "http://lonnieezell.github.io/my_model/",
+    "support": {
+        "issues": "http://lonnieezell.github.io/my_model/issues",
+        "source": "http://lonnieezell.github.io/my_model/"
+    },
+    "type": "codeigniter-core",
+    "require": {
+        "compwright/codeigniter-installers": "*"
+    }
+}
