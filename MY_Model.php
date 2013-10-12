@@ -281,7 +281,7 @@ class MY_Model extends CI_Model {
     {
         $rows = $this->limit(1)->find_all();
 
-        if (is_array($rows))
+        if (is_array($rows) && count($rows) == 1)
         {
             return $rows[0];
         }
