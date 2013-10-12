@@ -145,8 +145,27 @@ class MY_Model extends CI_Model {
     /**
      * An array of validation rules. This needs to be the same format
      * as validation rules passed to the Form_validation library.
+     *
+     * You can override this value into a string that is the name
+     * of a rule group, if you've saved the rules array into
+     * a config file as described in the CodeIgniter User Guide.
+     * http://ellislab.com/codeigniter/user-guide/libraries/form_validation.html#savingtoconfig
      */
-    protected $validate = array();
+    protected $validation_rules = array();
+
+    /**
+     * An array of rules to be added to the validation rules during
+     * insert type methods. This is commonly used to add a required rule
+     * that is only needed during inserts and not updates. The array
+     * requires the field_name as the key and the additional rules
+     * as the value string.
+     *
+     *      array(
+     *          'password' => 'required|matches[password]',
+     *          'username' => 'required'
+     *      )
+     */
+    protected $insert_validation_rules = array();
 
     /**
      * Optionally skip the validation. Used in conjunction with
@@ -422,39 +441,39 @@ class MY_Model extends CI_Model {
      * Inserts data into the database.
      *
      * @param  array $data An array of key/value pairs to insert to database.
-     * @param  array $skip_validation   If TRUE, will skip validation of data for this call only.
+     *
      * @return mixed       The primary_key value of the inserted record, or FALSE.
      */
-    public function insert($data, $skip_validation=FALSE)
+    public function insert($data)
     {
-        if ($data !== FALSE)
+        $data = $this->trigger('before_insert', $data);
+
+        if ($this->skip_validation === FALSE)
         {
-            $data = $this->trigger('before_insert', $data);
+            $data = $this->validate($data, 'insert');
 
-            if ($skip_validation === FALSE)
+            // If $data is false, we didn't validate
+            // so we need to get out of here.
+            if ( ! $data)
             {
-                $data = $this->validate($data);
+                return FALSE;
             }
+        }
 
-            $this->dbw->insert($this->_table, $data);
+        $this->dbw->insert($this->_table, $data);
 
-            if ($this->return_insert_id)
-            {
-                $id = $this->dbw->insert_id();
+        if ($this->return_insert_id)
+        {
+            $id = $this->dbw->insert_id();
 
-                $this->trigger('after_insert', $id);
-            }
-            else
-            {
-                $id = true;
-            }
-
-            return $id;
+            $this->trigger('after_insert', $id);
         }
         else
         {
-            return FALSE;
+            $id = true;
         }
+
+        return $id;
     }
 
     //--------------------------------------------------------------------
@@ -473,29 +492,26 @@ class MY_Model extends CI_Model {
      * );
      *
      * @param  array $data An associate array of rows to insert
-     * @param  array $skip_validation   If TRUE, will skip validation of data for this call only.
+     *
      * @return bool
      */
-    public function insert_batch($data, $skip_validation=FALSE)
+    public function insert_batch($data)
     {
-        if ($skip_validation === FALSE)
+        if ($this->skip_validation === FALSE)
         {
-            $data = $this->validate($data);
+            $data = $this->validate($data, 'insert');
+            if ( ! $data)
+            {
+                return FALSE;
+            }
         }
 
-        if ($data !== FALSE)
-        {
-            $data['batch'] = true;
-            $data = $this->trigger('before_insert', $data);
+        $data['batch'] = true;
+        $data = $this->trigger('before_insert', $data);
 
-            unset($data['batch']);
+        unset($data['batch']);
 
-            return $this->dbw->insert_batch($this->_table, $data);
-        }
-        else
-        {
-            return FALSE;
-        }
+        return $this->dbw->insert_batch($this->_table, $data);
     }
 
     //--------------------------------------------------------------------
@@ -505,33 +521,28 @@ class MY_Model extends CI_Model {
      *
      * @param  mixed $id   The primary_key value of the record to update.
      * @param  array $data An array of value pairs to update in the record.
-     * @param  array $skip_validation   If TRUE, will skip validation of data for this call only.
      * @return bool
      */
-    public function update($id, $data, $skip_validation=FALSE)
+    public function update($id, $data)
     {
         $data = $this->trigger('before_update', $data);
 
-        if ($skip_validation === FALSE)
+        if ($this->skip_validation === FALSE)
         {
             $data = $this->validate($data);
+            if ( ! $data)
+            {
+                return FALSE;
+            }
         }
 
-        // Will be false if it didn't validate.
-        if ($data !== FALSE)
-        {
-            $this->dbw->where($this->primary_key, $id);
-            $this->dbw->set($data);
-            $result = $this->dbw->update($this->_table);
+        $this->dbw->where($this->primary_key, $id);
+        $this->dbw->set($data);
+        $result = $this->dbw->update($this->_table);
 
-            $this->trigger('after_update', array($data, $result));
+        $this->trigger('after_update', array($data, $result));
 
-            return $result;
-        }
-        else
-        {
-            return FALSE;
-        }
+        return $result;
     }
 
     //--------------------------------------------------------------------
@@ -593,33 +604,28 @@ class MY_Model extends CI_Model {
      *
      * @param  array $ids  An array of primary_key values to update.
      * @param  array $data An array of value pairs to modify in each row.
-     * @param  array $skip_validation   If TRUE, will skip validation of data for this call only.
      * @return bool
      */
-    public function update_many($ids, $data, $skip_validation=FALSE)
+    public function update_many($ids, $data)
     {
         $data = $this->trigger('before_update', $data);
 
-        if ($skip_validation === FALSE)
+        if ($this->skip_validation === FALSE)
         {
             $data = $this->validate($data);
+            if ( ! $data)
+            {
+                return FALSE;
+            }
         }
 
-        // Will be false if it didn't validate.
-        if ($data !== FALSE)
-        {
-            $this->dbw->where_in($this->primary_key, $ids);
-            $this->dbw->set($data);
-            $result = $this->dbw->update($this->_table);
+        $this->dbw->where_in($this->primary_key, $ids);
+        $this->dbw->set($data);
+        $result = $this->dbw->update($this->_table);
 
-            $this->trigger('after_update', array($data, $result));
+        $this->trigger('after_update', array($data, $result));
 
-            return $result;
-        }
-        else
-        {
-            return FALSE;
-        }
+        return $result;
     }
 
     //--------------------------------------------------------------------
@@ -650,20 +656,21 @@ class MY_Model extends CI_Model {
 
         $data = $this->trigger('before_update', $data);
 
-        // Will be false if it didn't validate.
-        if ($this->validate($data) !== FALSE)
+        if ($this->skip_validation === FALSE)
         {
-            $this->dbw->set($data);
-            $result = $this->dbw->update($this->_table);
-
-            $this->trigger('after_update', array($data, $result));
-
-            return $result;
+            $data = $this->validate($data);
+            if ( ! $data)
+            {
+                return FALSE;
+            }
         }
-        else
-        {
-            return FALSE;
-        }
+
+        $this->dbw->set($data);
+        $result = $this->dbw->update($this->_table);
+
+        $this->trigger('after_update', array($data, $result));
+
+        return $result;
     }
 
     //--------------------------------------------------------------------
@@ -672,32 +679,27 @@ class MY_Model extends CI_Model {
      * Updates all records and sets the value pairs passed in the array.
      *
      * @param  array $data An array of value pairs with the data to change.
-     * @param  array $skip_validation   If TRUE, will skip validation of data for this call only.
      * @return bool
      */
-    public function update_all($data, $skip_validation=FALSE)
+    public function update_all($data)
     {
         $data = $this->trigger('before_update', $data);
 
         if ($skip_validation === FALSE)
         {
             $data = $this->validate($data);
+            if ( ! $data)
+            {
+                return FALSE;
+            }
         }
 
-        // Will be false if it didn't validate.
-        if ($data !== FALSE)
-        {
-            $this->dbw->set($data);
-            $result = $this->dbw->update($this->_table);
+        $this->dbw->set($data);
+        $result = $this->dbw->update($this->_table);
 
-            $this->trigger('after_update', array($data, $result));
+        $this->trigger('after_update', array($data, $result));
 
-            return $result;
-        }
-        else
-        {
-            return FALSE;
-        }
+        return $result;
     }
 
     //--------------------------------------------------------------------
@@ -857,9 +859,16 @@ class MY_Model extends CI_Model {
 
     //--------------------------------------------------------------------
 
-    public function skip_validation()
+    /**
+     * Sets the value of the skip_validation flag
+     *
+     * @param Bool $skip (optional) whether to skip validation in the model
+     *
+     * @return Object    returns $this to allow method chaining
+     */
+    public function skip_validation($skip=TRUE)
     {
-        $this->skip_validation = TRUE;
+        $this->skip_validation = $skip;
 
         return $this;
     }
@@ -1108,17 +1117,22 @@ class MY_Model extends CI_Model {
      * setup in the $this->validate property.
      *
      * @param  array $data      An array of validation rules
+     * @param string $type      Either 'insert' or 'update'
+     *
      * @return array/bool       The original data or FALSE
      */
-    public function validate($data)
+    public function validate($data, $type='update')
     {
-        if($this->skip_validation)
+        if ($this->skip_validation === TRUE)
         {
             return $data;
         }
 
-        if(!empty($this->validate))
+        if ( ! empty($this->validation_rules))
         {
+            // We have to add/override the values to the
+            // $_POST vars so that form_validation library
+            // can work with them.
             foreach($data as $key => $val)
             {
                 $_POST[$key] = $val;
@@ -1126,9 +1140,25 @@ class MY_Model extends CI_Model {
 
             $this->load->library('form_validation');
 
-            if(is_array($this->validate))
+            if (is_array($this->validation_rules))
             {
-                $this->form_validation->set_rules($this->validate);
+                // If $type == 'insert', then we need to incorporate the
+                // $insert_validation_rules.
+                if ($type == 'insert'
+                    && is_array($this->insert_validation_rules)
+                    && count($this->insert_validation_rules))
+                {
+                    foreach ($this->validation_rules as &$row)
+                    {
+                        if (isset($this->insert_validation_rules[$row['field']]))
+                        {
+                            $row['rules'] = $this->insert_validation_rules[$row['field']] .'|'. $row['rules'];
+                        }
+                    }
+                }
+
+                // Now validate!
+                $this->form_validation->set_rules($this->validation_rules);
 
                 if ($this->form_validation->run() === TRUE)
                 {
@@ -1139,9 +1169,11 @@ class MY_Model extends CI_Model {
                     return FALSE;
                 }
             }
+            // It could be a string representing the name of a rule group
+            // if you're saving the rules in a config file.
             else
             {
-                if ($this->form_validation->run($this->validate) === TRUE)
+                if ($this->form_validation->run($this->validation_rules) === TRUE)
                 {
                     return $data;
                 }
