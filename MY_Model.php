@@ -1113,6 +1113,54 @@ class MY_Model extends CI_Model {
     //--------------------------------------------------------------------
 
     /**
+     * Adds the 'required' rule to the field's validation rules if exists.
+     *
+     * @param  string $field The name of the field to require
+     * @return void
+     */
+    public function require_field($field)
+    {
+        if ( ! is_array($this->validation_rules) || ! count($this->validation_rules) )
+        {
+            return;
+        }
+
+        // If $field is an array, run them all through
+        // this same method.
+        if (is_array($field))
+        {
+            foreach ($field as $f)
+            {
+                $this->require_field($f);
+            }
+
+            return;
+        }
+
+        if ( ! is_string($field))
+        {
+            return;
+        }
+
+        for ($i = 1; $i < count($this->validation_rules); $i++)
+        {
+            if ($this->validation_rules[$i]['field'] == $field)
+            {
+                if (strpos($this->validation_rules[$i]['rules'], 'required'))
+                {
+                    // Already requiring this field.
+                    break;
+                }
+
+                $this->validation_rules[$i]['rules'] = 'required|'. $this->validation_rules[$i]['rules'];
+                break;
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------
+
+    /**
      * Validates the data passed into it based upon the form_validation rules
      * setup in the $this->validate property.
      *
@@ -1260,7 +1308,7 @@ class MY_Model extends CI_Model {
      *
      * @return string
      */
-    protected function get_db_error_message($db_type)
+    public function get_db_error_message($db_type)
     {
         switch ($this->{$db_type}->platform())
         {
