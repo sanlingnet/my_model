@@ -29,7 +29,7 @@ class MY_Model extends CI_Model {
      *
      * @var string;
      */
-    protected   $_table;
+    protected   $table_name;
 
     /**
      * The model's default primary key.
@@ -77,7 +77,7 @@ class MY_Model extends CI_Model {
         Access:
             Protected
     */
-    protected $log_user = FALSE;
+    protected $log_user = TRUE;
 
     /*
         Var: $created_by_field
@@ -305,11 +305,11 @@ class MY_Model extends CI_Model {
         // Ignore any soft-deleted rows
         if ($this->soft_deletes && $this->temp_with_deleted !== TRUE)
         {
-            $this->dbr->where($this->soft_delete_key, FALSE);
+            $this->dbr->where($this->table_name.'.'.$this->soft_delete_key, FALSE);
         }
 
         $this->dbr->where($this->primary_key, $id);
-        $row = $this->dbr->get($this->_table);
+        $row = $this->dbr->get($this->table_name);
         $row = $row->{$this->_return_type()}();
 
         $row = $this->trigger('after_find', $row);
@@ -347,7 +347,7 @@ class MY_Model extends CI_Model {
 
         $this->trigger('before_find');
 
-        $row = $this->dbr->get($this->_table);
+        $row = $this->dbr->get($this->table_name);
         $row = $row->{$this->_return_type()}();
 
         $row = $this->trigger('after_find', $row);
@@ -410,10 +410,10 @@ class MY_Model extends CI_Model {
         // Ignore any soft-deleted rows
         if ($this->soft_deletes && $this->temp_with_deleted !== TRUE)
         {
-            $this->dbr->where($this->soft_delete_key, FALSE);
+            $this->dbr->where($this->table_name.'.'.$this->soft_delete_key, FALSE);
         }
 
-        $rows = $this->db->get($this->_table);
+        $rows = $this->db->get($this->table_name);
         $rows = $rows->{$this->_return_type(true)}();
 
         if (is_array($rows))
@@ -460,7 +460,17 @@ class MY_Model extends CI_Model {
             }
         }
 
-        $this->dbw->insert($this->_table, $data);
+        if($this->set_created and empty($data[$this->created_field]))
+        {
+            $data[$this->created_field] = $this->set_date();
+        }
+
+        if($this->log_user)
+        {
+            $data[$this->created_by_field] = $this->auth->user_id();
+        }
+
+        $this->dbw->insert($this->table_name, $data);
 
         if ($this->return_insert_id)
         {
@@ -511,7 +521,7 @@ class MY_Model extends CI_Model {
 
         unset($data['batch']);
 
-        return $this->dbw->insert_batch($this->_table, $data);
+        return $this->dbw->insert_batch($this->table_name, $data);
     }
 
     //--------------------------------------------------------------------
@@ -537,8 +547,15 @@ class MY_Model extends CI_Model {
         }
 
         $this->dbw->where($this->primary_key, $id);
+
+        if ($this->log_user)
+        {
+            $data[$this->modified_by_field] = $this->auth->user_id();
+        }
+
         $this->dbw->set($data);
-        $result = $this->dbw->update($this->_table);
+
+        $result = $this->dbw->update($this->table_name);
 
         $this->trigger('after_update', array($data, $result));
 
@@ -577,7 +594,7 @@ class MY_Model extends CI_Model {
             $row = $this->trigger('before_update', $row);
         }
 
-        $result = $this->dbw->update_batch($this->_table, $data, $where_key);
+        $result = $this->dbw->update_batch($this->table_name, $data, $where_key);
 
         foreach ($data as &$row)
         {
@@ -621,7 +638,7 @@ class MY_Model extends CI_Model {
 
         $this->dbw->where_in($this->primary_key, $ids);
         $this->dbw->set($data);
-        $result = $this->dbw->update($this->_table);
+        $result = $this->dbw->update($this->table_name);
 
         $this->trigger('after_update', array($data, $result));
 
@@ -666,7 +683,7 @@ class MY_Model extends CI_Model {
         }
 
         $this->dbw->set($data);
-        $result = $this->dbw->update($this->_table);
+        $result = $this->dbw->update($this->table_name);
 
         $this->trigger('after_update', array($data, $result));
 
@@ -695,7 +712,7 @@ class MY_Model extends CI_Model {
         }
 
         $this->dbw->set($data);
-        $result = $this->dbw->update($this->_table);
+        $result = $this->dbw->update($this->table_name);
 
         $this->trigger('after_update', array($data, $result));
 
@@ -720,12 +737,12 @@ class MY_Model extends CI_Model {
         {
             $sets = $this->log_user ? array($this->soft_delete_key => 1, $this->deleted_by_field => $this->auth->user_id()) : array($this->soft_delete_key => 1);
 
-            $result = $this->dbw->update($this->_table, $sets);
+            $result = $this->dbw->update($this->table_name, $sets);
         }
 
         // Hard Delete
         else {
-            $result = $this->dbw->delete($this->_table);
+            $result = $this->dbw->delete($this->table_name);
         }
 
         $this->trigger('after_delete', $result);
@@ -746,11 +763,11 @@ class MY_Model extends CI_Model {
         {
             $sets = $this->log_user ? array($this->soft_delete_key => 1, $this->deleted_by_field => $this->auth->user_id()) : array($this->soft_delete_key => 1);
 
-            $result = $this->dbw->update($this->_table, $sets);
+            $result = $this->dbw->update($this->table_name, $sets);
         }
         else
         {
-            $result = $this->dbw->delete($this->_table);
+            $result = $this->dbw->delete($this->table_name);
         }
 
         $this->trigger('after_delete', $result);
@@ -778,16 +795,29 @@ class MY_Model extends CI_Model {
         {
             $sets = $this->log_user ? array($this->soft_delete_key => 1, $this->deleted_by_field => $this->auth->user_id()) : array($this->soft_delete_key => 1);
 
-            $result = $this->dbw->update($this->_table, $sets);
+            $result = $this->dbw->update($this->table_name, $sets);
         }
         else
         {
-            $result = $this->dbw->delete($this->_table);
+            $result = $this->dbw->delete($this->table_name);
         }
 
         $this->trigger('after_delete', $result);
 
         return $result;
+    }
+
+    //--------------------------------------------------------------------
+
+    /**
+     * Empty a table.
+     *
+     * @param $table String Table name.
+     * @return mixed
+     */
+    public function empty_table($table = NULL)
+    {
+        return $this->db->empty_table($table);
     }
 
     //--------------------------------------------------------------------
@@ -889,7 +919,7 @@ class MY_Model extends CI_Model {
         $where = func_get_args();
         $this->_set_where($where, 'dbr');
 
-        return $this->dbr->count_all_results($this->_table);
+        return $this->dbr->count_all_results($this->table_name);
     }
 
     //--------------------------------------------------------------------
@@ -901,7 +931,7 @@ class MY_Model extends CI_Model {
      */
     public function count_all()
     {
-        return $this->dbr->count_all($this->_table);
+        return $this->dbr->count_all($this->table_name);
     }
 
     //--------------------------------------------------------------------
@@ -913,7 +943,7 @@ class MY_Model extends CI_Model {
      */
     public function table()
     {
-        return $this->_table;
+        return $this->table_name;
     }
 
     //--------------------------------------------------------------------
@@ -939,7 +969,7 @@ class MY_Model extends CI_Model {
             $value = $args[0];
         }
 
-        $query = $this->dbr->select(array($key, $value))->get($this->_table);
+        $query = $this->dbr->select(array($key, $value))->get($this->table_name);
 
         $options = array();
         foreach ($query->result() as $row)
@@ -1381,10 +1411,10 @@ class MY_Model extends CI_Model {
     public function group_by($by) { $this->dbr->group_by($by); return $this; }
     public function having($key, $value = '', $escape = TRUE) { $this->dbr->having($key, $value, $escape); return $this; }
     public function or_having($key, $value = '', $escape = TRUE) { $this->dbr->or_having($key, $value, $escape); return $this; }
-    public function order_by($orderby, $direction = '') { $this->dbr->order_by($orderby, $direction); return $this; }
+    public function order_by($orderby, $direction = '') { $this->dbr->order_by($this->table_name.'.'.$orderby, $direction); return $this; }
     public function limit($value, $offset = '') { $this->dbr->limit($value, $offset); return $this; }
     public function offset($offset) { $this->dbr->offset($offset); return $this; }
     public function set($key, $value = '', $escape = TRUE) { $this->dbw->set($key, $value, $escape); return $this; }
-    public function count_all_results() { $this->dbr->count_all_results($this->_table); return $this; }
+    public function count_all_results() { $this->dbr->count_all_results($this->table_name); return $this; }
 
 }
